@@ -70,6 +70,192 @@ export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 && \
 palmtest --cases urban_environment_restart --cores 4"
 ```
 
+## Running PALM Simulations - Step by Step
+
+This section provides detailed instructions for setting up and running PALM simulations inside the Docker container.
+
+### Understanding PALM Directory Structure
+
+PALM uses a specific directory structure for organizing simulations:
+
+```
+/opt/palm/install/
+├── .palm.config.default          # Default configuration file
+├── bin/                          # PALM executables
+└── JOBS/                         # Simulation jobs directory
+    └── <job_name>/               # Individual job directory (e.g., example_cbl)
+        ├── INPUT/                # Input parameter files
+        │   └── <job_name>_p3d    # Main parameter file
+        ├── OUTPUT/               # Simulation output files
+        ├── MONITORING/           # Runtime monitoring data
+        └── RESTART/              # Restart files for continuation runs
+```
+
+### Running the Example CBL (Convective Boundary Layer) Case
+
+The `example_cbl` case is a preconfigured example that simulates a convective boundary layer. Follow these steps:
+
+#### Step 1: Start the Container with Persistent Storage
+
+```bash
+# Create a directory on your host system for PALM jobs
+mkdir -p ~/palm_jobs
+
+# Start container with volume mount
+docker run -it -v ~/palm_jobs:/opt/palm/install/JOBS joshbl90/palm:latest bash
+```
+
+#### Step 2: Set Up the Example Case
+
+Inside the container:
+
+```bash
+# Set MPI environment variables
+export OMPI_ALLOW_RUN_AS_ROOT=1
+export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+
+# Create job directory structure
+mkdir -p /opt/palm/install/JOBS/example_cbl/INPUT
+
+# Copy the example parameter file
+cp /opt/palm/palm_model_system-master/packages/palm/model/tests/cases/example_cbl/INPUT/example_cbl_p3d \
+   /opt/palm/install/JOBS/example_cbl/INPUT/
+
+# Navigate to installation directory
+cd /opt/palm/install
+```
+
+#### Step 3: Run the Simulation
+
+```bash
+palmrun -r example_cbl -c default -a "d3#" -X 4 -v -z
+```
+
+**Command explanation:**
+- `-r example_cbl` - Run identifier (job name)
+- `-c default` - Use default configuration file
+- `-a "d3#"` - Activation strings (enables 3D data output)
+- `-X 4` - Number of CPU cores to use
+- `-v` - Verbose output
+- `-z` - Force recompilation
+
+#### Step 4: Check Results
+
+After the simulation completes:
+
+```bash
+# View monitoring output
+ls -lh /opt/palm/install/JOBS/example_cbl/MONITORING/
+
+# Check run control file
+cat /opt/palm/install/JOBS/example_cbl/MONITORING/example_cbl_rc
+
+# List output files
+ls -lh /opt/palm/install/JOBS/example_cbl/OUTPUT/
+```
+
+Results will also be available on your host system in `~/palm_jobs/example_cbl/`.
+
+### Running Other Example Cases
+
+PALM includes 24 test cases. Here are some common ones:
+
+#### Urban Environment Case
+
+```bash
+# Set up the case
+mkdir -p /opt/palm/install/JOBS/urban_environment/INPUT
+cp /opt/palm/palm_model_system-master/packages/palm/model/tests/cases/urban_environment/INPUT/* \
+   /opt/palm/install/JOBS/urban_environment/INPUT/
+
+# Run the simulation
+cd /opt/palm/install
+palmrun -r urban_environment -c default -a "d3#" -X 4 -v -z
+```
+
+#### Listing All Available Test Cases
+
+```bash
+ls /opt/palm/palm_model_system-master/packages/palm/model/tests/cases/
+```
+
+Available cases include:
+- `example_cbl` - Convective boundary layer
+- `example_cbl_restart` - CBL with restart capability
+- `urban_environment` - Urban canyon simulation
+- `urban_environment_restart` - Urban case with restart
+- `street_canyon` - Street canyon flow
+- `wind_turbine_model` - Wind turbine simulation
+- `warm_air_bubble_lcm` - Warm air bubble with cloud microphysics
+- `oceanml` - Ocean mixed layer
+- And many more...
+
+### Understanding palmrun Output
+
+When you run `palmrun`, you'll see:
+
+1. **Configuration summary** - Shows compiler options, number of cores, and run parameters
+2. **Compilation status** - Reports if executable needs building
+3. **Input file copying** - Lists which input files are being used
+4. **Execution progress** - Shows the simulation running
+5. **Completion message** - Confirms successful completion
+
+Example output structure:
+```
+*** palmrun will be executed. Please wait ...
+*** creating executable and other sources for the local host
+*** executable and other sources created
+*** providing INPUT-files:
+>>> INPUT: /opt/palm/install/JOBS/example_cbl/INPUT/example_cbl_p3d  to  PARIN
+*** all INPUT-files provided
+*** execution starts in directory "/opt/palm/install/tmp/example_cbl.xxxxx"
+*** execute command: "mpirun -n 4 ./palm"
+*** palmrun finished
+```
+
+### Customizing Simulations
+
+To create your own simulation:
+
+1. **Create job directory:**
+   ```bash
+   mkdir -p /opt/palm/install/JOBS/my_simulation/INPUT
+   ```
+
+2. **Create or copy parameter file:**
+   ```bash
+   # Start from an example
+   cp /opt/palm/install/JOBS/example_cbl/INPUT/example_cbl_p3d \
+      /opt/palm/install/JOBS/my_simulation/INPUT/my_simulation_p3d
+   ```
+
+3. **Edit parameters** using any text editor (nano, vi, etc.)
+
+4. **Run your simulation:**
+   ```bash
+   cd /opt/palm/install
+   palmrun -r my_simulation -c default -a "d3#" -X 4 -v -z
+   ```
+
+### One-Line Docker Commands for Quick Testing
+
+Run complete simulation from host without entering container:
+
+```bash
+# Example CBL case
+docker run -it -v ~/palm_jobs:/opt/palm/install/JOBS joshbl90/palm:latest bash -c "\
+export OMPI_ALLOW_RUN_AS_ROOT=1 && \
+export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 && \
+mkdir -p /opt/palm/install/JOBS/example_cbl/INPUT && \
+cp /opt/palm/palm_model_system-master/packages/palm/model/tests/cases/example_cbl/INPUT/example_cbl_p3d \
+   /opt/palm/install/JOBS/example_cbl/INPUT/ && \
+cd /opt/palm/install && \
+palmrun -r example_cbl -c default -a 'd3#' -X 4 -v -z"
+
+# Check results on host
+ls -lh ~/palm_jobs/example_cbl/MONITORING/
+```
+
 ## Running with Persistent Data
 
 To save simulation results and use custom input files:
@@ -220,30 +406,30 @@ palm-docker/
     └── bin/                    # Executables (palmrun, palmtest, etc.)
 ```
 
-## Example Simulations
-
-### Convective Boundary Layer (CBL)
-
-```bash
-export OMPI_ALLOW_RUN_AS_ROOT=1
-export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
-
-palmrun -r example_cbl -c default -a "d3#" -X 4 -v -z
-```
-
-### Urban Environment
-
-```bash
-export OMPI_ALLOW_RUN_AS_ROOT=1
-export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
-
-palmtest --cases urban_environment_restart --cores 4
-```
+## Quick Reference - Common Commands
 
 ### List Available Test Cases
 
 ```bash
-ls /opt/palm/palm_model_system-master/TESTS/cases/
+# Inside container
+ls /opt/palm/palm_model_system-master/packages/palm/model/tests/cases/
+
+# From host
+docker run --rm joshbl90/palm:latest ls /opt/palm/palm_model_system-master/packages/palm/model/tests/cases/
+```
+
+### View PALM Version
+
+```bash
+# Inside container
+cd /opt/palm/install && palmrun -v
+```
+
+### Clean Up Temporary Files
+
+```bash
+# Inside container
+rm -rf /opt/palm/install/tmp/*
 ```
 
 ## System Requirements
@@ -278,4 +464,4 @@ This Docker configuration is provided as-is. PALM itself is distributed under it
 - **Base Image**: Ubuntu 20.04
 - **Compiler**: GFortran (GCC)
 - **MPI**: OpenMPI
-- **Last Updated**: January 2025
+- **Last Updated**: October 2025
