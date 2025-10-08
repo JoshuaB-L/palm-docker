@@ -1,0 +1,12 @@
+# History files
+.history/
+
+# IDE files
+.vscode/
+*.code-workspace
+
+# Local Claude settings
+.claude/
+
+# Build artifacts
+*.zip
